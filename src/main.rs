@@ -84,7 +84,13 @@ fn main() {
     let mut username = config.username;
     let mut password = config.password;
     let mut client = Client::new();
-    let (scrobbles, errors) = parse_log(opts.file, !opts.skip_timezone_correction);
+    let (scrobbles, errors) = match parse_log(opts.file, !opts.skip_timezone_correction) {
+        Ok(data) => data,
+        Err(_) => {
+            eprintln!("There was a problem loading the file. Please ensure you have typed a path to a valid RockBox scrobble log.");
+            return;
+        }
+    };
 
     println!("{} scrobbles loaded, {} failed.", scrobbles.len(), errors);
 

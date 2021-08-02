@@ -155,8 +155,11 @@ impl Client {
     }
 }
 
-pub fn parse_log(filename: String, convert_timezone: bool) -> (Vec<Scrobble>, i32) {
-    let contents = fs::read_to_string(filename).expect("failed to read file");
+pub fn parse_log(
+    filename: String,
+    convert_timezone: bool,
+) -> Result<(Vec<Scrobble>, i32), Box<dyn Error>> {
+    let contents = fs::read_to_string(filename)?;
 
     let mut scrobbles: Vec<Scrobble> = vec![];
     let mut errors = 0;
@@ -240,5 +243,5 @@ pub fn parse_log(filename: String, convert_timezone: bool) -> (Vec<Scrobble>, i3
         };
         scrobbles.push(scrobble);
     }
-    (scrobbles, errors)
+    Ok((scrobbles, errors))
 }
