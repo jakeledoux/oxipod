@@ -1,4 +1,3 @@
-#[allow(unused)]
 mod scrobble;
 
 use clap::{AppSettings, Clap};
@@ -6,6 +5,9 @@ use confy;
 use dialoguer::{Confirm, Input, Password};
 use scrobble::*;
 use serde::{Deserialize, Serialize};
+
+const APP_NAME: &str = "oxipod";
+const APP_VERSION: &str = "0.1";
 
 #[derive(Serialize, Deserialize)]
 struct Config {
@@ -17,7 +19,7 @@ struct Config {
 impl ::std::default::Default for Config {
     fn default() -> Self {
         Self {
-            version: "0.1".into(),
+            version: APP_VERSION.into(),
             username: "".into(),
             password: "".into(),
         }
@@ -54,14 +56,14 @@ fn main() {
     let mut config: Config = Config::default();
 
     if opts.wipe_config {
-        match confy::store("oxipod", &config) {
+        match confy::store(APP_NAME, &config) {
             Ok(_) => {}
             Err(_) => {
                 eprintln!("Failed to write to config file.");
             }
         }
     } else {
-        config = confy::load("oxipod").expect("Failed to access config file.");
+        config = confy::load(APP_NAME).expect("Failed to access config file.");
     }
 
     let mut username = config.username;
@@ -105,7 +107,7 @@ fn main() {
                 config.username = username.clone();
                 config.password = password.clone();
                 if write_config {
-                    match confy::store("oxipod", &config) {
+                    match confy::store(APP_NAME, &config) {
                         Ok(_) => {
                             println!("Credentials saved.");
                         }
