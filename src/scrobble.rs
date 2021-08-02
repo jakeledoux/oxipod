@@ -87,14 +87,14 @@ impl Client {
 
     pub fn authenticate(
         &mut self,
-        username: String,
-        password: String,
+        username: &String,
+        password: &String,
     ) -> Result<(), Box<dyn Error>> {
         let resp = self.post(
             "auth.getMobileSession",
             vec![
-                (String::from("username"), username),
-                (String::from("password"), password),
+                (String::from("username"), username.clone()),
+                (String::from("password"), password.clone()),
             ],
         )?;
         let auth_response: serde_json::Value = resp.json()?;
