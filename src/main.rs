@@ -1,6 +1,7 @@
 mod scrobble;
 
 use clap::{AppSettings, Clap};
+use comfy_table::{presets::UTF8_FULL, Table};
 use confy;
 use dialoguer::{Confirm, Input, Password};
 use scrobble::*;
@@ -40,15 +41,29 @@ struct Opts {
 }
 
 fn show_scrobbles(scrobbles: &Vec<Scrobble>) {
+    let mut table = Table::new();
+    table
+        .load_preset(UTF8_FULL)
+        .set_header(vec!["Completed", "Artist", "Title", "Album", "Time"]);
+
     for scrobble in scrobbles {
-        println!(
-            "{} - {} - {} at {}",
-            scrobble.artist,
-            scrobble.title,
-            scrobble.album,
-            scrobble.datetime.to_string()
-        );
+        table.add_row(vec![
+            {
+                if !scrobble.skipped {
+                    "Y"
+                } else {
+                    "N"
+                }
+            }
+            .into(),
+            scrobble.artist.clone(),
+            scrobble.title.clone(),
+            scrobble.album.clone(),
+            scrobble.datetime.to_string(),
+        ]);
     }
+
+    println!("{}", table);
 }
 
 fn main() {
