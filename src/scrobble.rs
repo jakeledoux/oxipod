@@ -1,7 +1,4 @@
 use chrono::{offset::LocalResult, Local, NaiveDateTime, TimeZone, Utc};
-use md5;
-use reqwest;
-use serde_json;
 use std::error::Error;
 use std::fmt;
 use std::fs;
@@ -48,8 +45,7 @@ impl Client {
         }
     }
 
-    fn get_signature(&self, query: &Vec<(String, String)>) -> String {
-        let mut query = query.clone();
+    fn get_signature(&self, mut query: Vec<(String, String)>) -> String {
         query.sort_by_key(|e| e.0.clone());
 
         let mut signature = String::new();
@@ -66,7 +62,7 @@ impl Client {
     fn build_query(&self, method: &str, mut query: Vec<(String, String)>) -> Vec<(String, String)> {
         query.push((String::from("method"), String::from(method)));
         query.push((String::from("api_key"), self.api_key.clone()));
-        query.push((String::from("api_sig"), self.get_signature(&query)));
+        query.push((String::from("api_sig"), self.get_signature(query.clone())));
         query.push((String::from("format"), String::from("json")));
         query
     }
@@ -85,24 +81,17 @@ impl Client {
         self.http_client.execute(req)
     }
 
-    pub fn authenticate(
-        &mut self,
-        username: &String,
-        password: &String,
-    ) -> Result<(), Box<dyn Error>> {
+    pub fn authenticate(&mut self, username: &str, password: &str) -> Result<(), Box<dyn Error>> {
         let resp = self.post(
             "auth.getMobileSession",
             vec![
-                (String::from("username"), username.clone()),
-                (String::from("password"), password.clone()),
+                (String::from("username"), username.to_string()),
+                (String::from("password"), password.to_string()),
             ],
         )?;
         let auth_response: serde_json::Value = resp.json()?;
 
-        self.session_key = match auth_response["session"]["key"].as_str() {
-            Some(s) => Some(String::from(s)),
-            None => None,
-        };
+        self.session_key = auth_response["session"]["key"].as_str().map(String::from);
 
         if self.session_key.is_none() {
             return Err(Box::new(ScrobbleError));
@@ -237,9 +226,9 @@ pub fn parse_log(
             album,
             number,
             duration,
-            skipped,
             timestamp,
             datetime,
+            skipped,
         };
         scrobbles.push(scrobble);
     }

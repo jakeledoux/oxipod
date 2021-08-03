@@ -2,7 +2,6 @@ mod scrobble;
 
 use clap::{AppSettings, Clap};
 use comfy_table::{presets::UTF8_FULL, Table};
-use confy;
 use dialoguer::{Confirm, Input, Password};
 use scrobble::*;
 use serde::{Deserialize, Serialize};
@@ -40,7 +39,7 @@ struct Opts {
     wipe_config: bool,
 }
 
-fn show_scrobbles(scrobbles: &Vec<Scrobble>) {
+fn show_scrobbles(scrobbles: &[Scrobble]) {
     let mut table = Table::new();
     table
         .load_preset(UTF8_FULL)
@@ -153,14 +152,13 @@ fn main() {
                 match client.scrobble(scrobbles) {
                     Ok((accepted, rejected)) => {
                         println!("{} tracks scrobbled.", accepted);
-                        if rejected.len() > 0 {
+                        if !rejected.is_empty() {
                             println!("{} tracks failed to scrobble:", rejected.len());
                             show_scrobbles(&rejected);
                         }
                     }
                     Err(_) => {
                         eprintln!("Failed to submit scrobbles.");
-                        return;
                     }
                 };
             }
