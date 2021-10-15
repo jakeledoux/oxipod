@@ -14,29 +14,38 @@ struct Config {
     version: String,
     username: String,
     password: String,
+    log_file: Option<String>,
 }
 
-impl ::std::default::Default for Config {
+impl Default for Config {
     fn default() -> Self {
         Self {
             version: APP_VERSION.into(),
             username: "".into(),
             password: "".into(),
+            log_file: None,
         }
     }
 }
 
 #[derive(Clap)]
-#[clap(version = "0.1", author = "Jake Ledoux <contactjakeledoux@gmail.com>")]
+#[clap(
+    version = "0.2.0",
+    author = "Jake Ledoux <contactjakeledoux@gmail.com>"
+)]
 #[clap(setting = AppSettings::ColoredHelp)]
 struct Opts {
-    file: String,
+    file: Option<String>,
     #[clap(long, short)]
     dry_run: bool,
     #[clap(long, short)]
     skip_timezone_correction: bool,
+    #[clap(long, short)]
+    keep_log: bool,
     #[clap(long)]
     wipe_config: bool,
+    #[clap(long)]
+    skip_save_location: bool,
 }
 
 fn show_scrobbles(scrobbles: &[Scrobble]) {
@@ -83,10 +92,29 @@ fn main() {
     let mut username = config.username;
     let mut password = config.password;
     let mut client = Client::new();
-    let (scrobbles, errors) = match parse_log(opts.file, !opts.skip_timezone_correction) {
+
+    let file = match opts.file.clone() {
+        Some(f) => f,
+        None => match (&config.log_file).clone() {
+            Some(f) => f.clone(),
+            None => {
+                eprintln!(
+                    "Scrobble log file location must be specified if not set in config file."
+                );
+                return;
+            }
+        },
+    };
+
+    let (scrobbles, errors) = match parse_log(&file, !opts.skip_timezone_correction) {
         Ok(data) => data,
         Err(_) => {
-            eprintln!("There was a problem loading the file. Please ensure you have typed a path to a valid RockBox scrobble log.");
+            eprintln!(
+                "There was a problem loading the file. Please ensure you have typed a path to \
+                a valid RockBox scrobble log and that the file still exists. If you're reading \
+                this and did not provide a filename then it was found in your config file. Just \
+                enter a filename manually to override."
+            );
             return;
         }
     };
@@ -142,6 +170,19 @@ fn main() {
                 return;
             }
         }
+
+        let new_config_file = Some(file.clone());
+        if config.log_file != new_config_file && !opts.skip_save_location {
+            config.log_file = new_config_file;
+            match confy::store(APP_NAME, &config) {
+                Ok(_) => {
+                    println!("Default log file location saved.");
+                }
+                Err(_) => {
+                    eprintln!("Failed to write to config file.");
+                }
+            };
+        }
     }
 
     show_scrobbles(&scrobbles);
@@ -152,7 +193,14 @@ fn main() {
                 match client.scrobble(scrobbles) {
                     Ok((accepted, rejected)) => {
                         println!("{} tracks scrobbled.", accepted);
-                        if !rejected.is_empty() {
+                        if rejected.is_empty() {
+                            if !opts.keep_log {
+                                match std::fs::remove_file(file) {
+                                        Ok(_) => println!("Removed log file."),
+                                        Err(_) => eprintln!("Failed to remove log file (it may be in use by another process). Make sure you manually delete this."),
+                                    }
+                            }
+                        } else {
                             println!("{} tracks failed to scrobble:", rejected.len());
                             show_scrobbles(&rejected);
                         }

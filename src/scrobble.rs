@@ -126,14 +126,19 @@ impl Client {
                     accepted += status["scrobbles"]["@attr"]["accepted"].as_i64().unwrap() as i32;
 
                     // Collect rejected scrobbles to be returned
-                    for (i, scrobble) in status["scrobbles"]["scrobble"]
-                        .as_array()
-                        .unwrap()
-                        .iter()
-                        .enumerate()
-                    {
+                    if let Some(new_rejects) = status["scrobbles"]["scrobble"].as_array() {
+                        for (i, scrobble) in new_rejects.iter().enumerate() {
+                            if scrobble["ignoredMessage"]["code"] != "0" {
+                                rejected.push(chunk[i].clone());
+                            }
+                        }
+                    } else {
+                        // Failed to unwrap as_array() because only one scrobble was submitted
+                        assert_eq!(chunk.len(), 1);
+
+                        let scrobble = &status["scrobbles"]["scrobble"];
                         if scrobble["ignoredMessage"]["code"] != "0" {
-                            rejected.push(chunk[i].clone());
+                            rejected.push(chunk[0].clone());
                         }
                     }
                 }
@@ -145,7 +150,7 @@ impl Client {
 }
 
 pub fn parse_log(
-    filename: String,
+    filename: &str,
     convert_timezone: bool,
 ) -> Result<(Vec<Scrobble>, i32), Box<dyn Error>> {
     let contents = fs::read_to_string(filename)?;
