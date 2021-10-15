@@ -134,11 +134,13 @@ impl Client {
                         }
                     } else {
                         // Failed to unwrap as_array() because only one scrobble was submitted
-                        assert_eq!(chunk.len(), 1);
+                        let scrobble_able: Vec<&Scrobble> =
+                            chunk.iter().filter(|s| !s.skipped).collect();
+                        assert_eq!(scrobble_able.len(), 1);
 
                         let scrobble = &status["scrobbles"]["scrobble"];
                         if scrobble["ignoredMessage"]["code"] != "0" {
-                            rejected.push(chunk[0].clone());
+                            rejected.push(scrobble_able[0].clone());
                         }
                     }
                 }
