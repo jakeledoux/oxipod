@@ -1,8 +1,8 @@
 # Oxipod
 
-An iPod + Rockbox scrobbler written in Rust.
+A Rockbox scrobbler written in Rust.
 
-## Todo:
+## To-Do:
 
-[ ] - Timeless scrobbling (".scrobbler-timeless.log")
-[ ] - delete log when partial success (store failures in '.scrobbler-error.log'
+- [ ] timeless scrobbling (".scrobbler-timeless.log")
+- [ ] delete log when partial success (store failures in ".scrobbler-error.log")
