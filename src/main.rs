@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 
 mod scrobble;
 
-const APP_NAME: &str = "oxipod";
-const APP_VERSION: &str = "0.1";
+const APP_NAME: &str = env!("CARGO_PKG_NAME");
+const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Serialize, Deserialize)]
 struct Config {
@@ -31,24 +31,21 @@ impl Default for Config {
 }
 
 #[derive(Clap)]
-#[clap(
-    version = "0.2.0",
-    author = "Jake Ledoux <contactjakeledoux@gmail.com>"
-)]
+#[clap(version, author)]
 #[clap(setting = AppSettings::ColoredHelp)]
 #[allow(clippy::struct_excessive_bools)]
 struct Opts {
+    /// ".scrobbler.log" path
     file: Option<String>,
+    /// preview scrobbles but don't submit to last.fm
     #[clap(long, short)]
     dry_run: bool,
-    #[clap(long, short)]
-    skip_timezone_correction: bool,
+    /// persist log file even if scrobbles succeed
     #[clap(long, short)]
     keep_log: bool,
+    /// ignore and overwrite oxipod config file
     #[clap(long)]
     wipe_config: bool,
-    #[clap(long)]
-    skip_save_location: bool,
 }
 
 fn show_scrobbles(scrobbles: &[Scrobble]) {
@@ -98,7 +95,7 @@ fn main() {
         return;
     };
 
-    if let Ok(scrobbles) = parse_log(&file, !opts.skip_timezone_correction) {
+    if let Ok(scrobbles) = parse_log(&file, true) {
         println!("{} scrobbles loaded.", scrobbles.len());
 
         if !opts.dry_run {
@@ -135,7 +132,7 @@ fn main() {
             }
 
             let new_config_file = Some(file.clone());
-            if config.log_file != new_config_file && !opts.skip_save_location {
+            if config.log_file != new_config_file {
                 config.log_file = new_config_file;
                 if confy::store(APP_NAME, &config).is_ok() {
                     println!("Default log file location saved.");
