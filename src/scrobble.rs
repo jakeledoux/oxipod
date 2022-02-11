@@ -1,15 +1,13 @@
-use std::fs;
-
-use chrono::{offset::LocalResult, Local, NaiveDateTime, TimeZone, Utc};
+use chrono::{Local, NaiveDateTime, TimeZone, Utc};
+use serde::de::{self, Deserializer, Unexpected};
+use serde::Deserialize;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 #[allow(clippy::enum_variant_names)]
 pub enum OxipodError {
-    #[error("failed to read log file")]
-    ReadError(#[from] std::io::Error),
     #[error("failed to parse scrobble log")]
-    ParseError,
+    ParseError(#[from] csv::Error),
     #[error("failed to authenticate with last.fm")]
     AuthError,
     #[error("bad response from last.fm")]
@@ -18,16 +16,41 @@ pub enum OxipodError {
     ScrobbleError,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct Scrobble {
     pub artist: String,
-    pub title: String,
     pub album: String,
+    pub title: String,
     pub number: i32,
     pub duration: i32,
-    pub timestamp: i64,
-    pub datetime: NaiveDateTime,
+    #[serde(deserialize_with = "deserialize_skipped")]
     pub skipped: bool,
+    pub timestamp: i64,
+}
+
+impl Scrobble {
+    #[must_use]
+    pub fn local_timestamp(&self) -> String {
+        self.local_datetime().timestamp().to_string()
+    }
+
+    #[must_use]
+    pub fn utc_timestamp(&self) -> String {
+        self.utc_datetime().timestamp().to_string()
+    }
+
+    #[must_use]
+    pub fn utc_datetime(&self) -> NaiveDateTime {
+        Local
+            .from_local_datetime(&self.local_datetime())
+            .unwrap()
+            .naive_utc()
+    }
+
+    #[must_use]
+    pub fn local_datetime(&self) -> NaiveDateTime {
+        Utc.timestamp_opt(self.timestamp, 0).unwrap().naive_local()
+    }
 }
 
 pub struct Client {
@@ -38,8 +61,8 @@ pub struct Client {
     session_key: Option<String>,
 }
 
-impl Client {
-    pub fn new() -> Self {
+impl Default for Client {
+    fn default() -> Self {
         Self {
             http_client: reqwest::blocking::Client::new(),
             endpoint: "http://ws.audioscrobbler.com/2.0".to_string(),
@@ -47,6 +70,13 @@ impl Client {
             api_secret: "d65eae6191a3951aa1f9e50ac8b55ae0".to_string(),
             session_key: None,
         }
+    }
+}
+
+impl Client {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
     }
 
     fn get_signature(&self, mut query: Vec<(String, String)>) -> String {
@@ -113,7 +143,7 @@ impl Client {
                 for (i, scrobble) in chunk.iter().filter(|s| !s.skipped).enumerate() {
                     query.push((format!("artist[{}]", i), scrobble.artist.clone()));
                     query.push((format!("track[{}]", i), scrobble.title.clone()));
-                    query.push((format!("timestamp[{}]", i), scrobble.timestamp.to_string()));
+                    query.push((format!("timestamp[{}]", i), scrobble.utc_timestamp()));
                     query.push((format!("album[{}]", i), scrobble.album.clone()));
                     query.push((format!("trackNumber[{}]", i), scrobble.number.to_string()));
                 }
@@ -150,68 +180,24 @@ impl Client {
     }
 }
 
-#[allow(clippy::match_on_vec_items)]
-fn parse_row(row: &str, convert_timezone: bool) -> Result<Scrobble, OxipodError> {
-    let columns: Vec<&str> = row.split('\t').collect();
-
-    // insufficient column data
-    if columns.len() < 7 {
-        return Err(OxipodError::ParseError);
-    }
-
-    let artist = columns[0].to_string();
-    let album = columns[1].to_string();
-    let title = columns[2].to_string();
-    let number: i32 = columns[3].parse().map_err(|_| OxipodError::ParseError)?;
-    let duration: i32 = columns[4].parse().map_err(|_| OxipodError::ParseError)?;
-    let skipped = match columns[5] {
-        "L" => false,
-        "S" => true,
-        _ => {
-            return Err(OxipodError::ParseError);
-        }
-    };
-    let (datetime, timestamp) = match columns[6].parse() {
-        Ok(n) => {
-            let dt = match Utc.timestamp_opt(n, 0) {
-                LocalResult::Single(ts) => ts,
-                _ => {
-                    return Err(OxipodError::ParseError);
-                }
-            };
-            if convert_timezone {
-                let dt = match Local.from_local_datetime(&dt.naive_utc()) {
-                    LocalResult::Single(ts) => ts,
-                    _ => {
-                        return Err(OxipodError::ParseError);
-                    }
-                };
-                (dt.naive_local(), dt.timestamp())
-            } else {
-                (dt.naive_local(), n)
-            }
-        }
-        Err(_) => {
-            return Err(OxipodError::ParseError);
-        }
-    };
-
-    Ok(Scrobble {
-        artist,
-        title,
-        album,
-        number,
-        duration,
-        timestamp,
-        datetime,
-        skipped,
-    })
+pub fn parse_log(filename: &str) -> Result<Vec<Scrobble>, OxipodError> {
+    Ok(csv::ReaderBuilder::new()
+        .comment(Some(b'#'))
+        .delimiter(b'\t')
+        .has_headers(false)
+        .from_path(filename)?
+        .deserialize()
+        .collect::<Result<_, _>>()
+        .unwrap())
 }
 
-pub fn parse_log(filename: &str, convert_timezone: bool) -> Result<Vec<Scrobble>, OxipodError> {
-    fs::read_to_string(filename)?
-        .split('\n')
-        .filter(|line| !line.is_empty() && !line.starts_with('#'))
-        .map(|line| parse_row(line, convert_timezone))
-        .collect()
+fn deserialize_skipped<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match String::deserialize(deserializer)?.as_ref() {
+        "S" => Ok(true),
+        "L" => Ok(false),
+        other => Err(de::Error::invalid_value(Unexpected::Str(other), &"S or L")),
+    }
 }

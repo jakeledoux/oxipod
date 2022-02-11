@@ -1,12 +1,11 @@
-#![warn(clippy::all, clippy::pedantic, clippy::nursery)]
-
+#![warn(clippy::all, clippy::nursery)]
 use clap::{AppSettings, Clap};
 use comfy_table::{presets::UTF8_FULL, Table};
 use dialoguer::{Confirm, Input, Password};
 use scrobble::{parse_log, Client, Scrobble};
 use serde::{Deserialize, Serialize};
 
-mod scrobble;
+pub mod scrobble;
 
 const APP_NAME: &str = env!("CARGO_PKG_NAME");
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -50,9 +49,14 @@ struct Opts {
 
 fn show_scrobbles(scrobbles: &[Scrobble]) {
     let mut table = Table::new();
-    table
-        .load_preset(UTF8_FULL)
-        .set_header(vec!["Completed", "Artist", "Title", "Album", "Time"]);
+    table.load_preset(UTF8_FULL).set_header(vec![
+        "Completed",
+        "Artist",
+        "Title",
+        "Album",
+        "Time (Local)",
+        "Time (UTC)",
+    ]);
 
     for scrobble in scrobbles {
         table.add_row(vec![
@@ -67,7 +71,8 @@ fn show_scrobbles(scrobbles: &[Scrobble]) {
             scrobble.artist.clone(),
             scrobble.title.clone(),
             scrobble.album.clone(),
-            scrobble.datetime.to_string(),
+            scrobble.local_datetime().to_string(),
+            scrobble.utc_datetime().to_string(),
         ]);
     }
 
@@ -95,7 +100,7 @@ fn main() {
         return;
     };
 
-    if let Ok(scrobbles) = parse_log(&file, true) {
+    if let Ok(scrobbles) = parse_log(&file) {
         println!("{} scrobbles loaded.", scrobbles.len());
 
         if !opts.dry_run {
