@@ -51,6 +51,10 @@ impl Scrobble {
     pub fn local_datetime(&self) -> NaiveDateTime {
         Utc.timestamp_opt(self.timestamp, 0).unwrap().naive_local()
     }
+
+    pub fn shift_time(&mut self, minutes: i64) {
+        self.timestamp += minutes * 60
+    }
 }
 
 pub struct Client {

@@ -55,7 +55,6 @@ fn show_scrobbles(scrobbles: &[Scrobble]) {
         "Title",
         "Album",
         "Time (Local)",
-        "Time (UTC)",
     ]);
 
     for scrobble in scrobbles {
@@ -72,7 +71,6 @@ fn show_scrobbles(scrobbles: &[Scrobble]) {
             scrobble.title.clone(),
             scrobble.album.clone(),
             scrobble.local_datetime().to_string(),
-            scrobble.utc_datetime().to_string(),
         ]);
     }
 
