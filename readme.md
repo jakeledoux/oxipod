@@ -24,6 +24,9 @@ FLAGS:
 
 ## To-Do:
 
-- [ ] **important** manual time correction
+- [x] **important** manual time correction
+- [x] scrobble editing
 - [ ] timeless scrobbling (".scrobbler-timeless.log")
 - [ ] delete log when partial success (store failures in ".scrobbler-error.log")
+- [ ] warn on outdated scrobbles
+- [ ] $EDITOR-based scrobble editing

@@ -1,7 +1,7 @@
 #![warn(clippy::all, clippy::nursery)]
 use clap::{AppSettings, Clap};
 use comfy_table::{presets::UTF8_FULL, Table};
-use dialoguer::{Confirm, Input, Password};
+use dialoguer::{Confirm, Input, MultiSelect, Password, Select};
 use scrobble::{parse_log, Client, Scrobble};
 use serde::{Deserialize, Serialize};
 
@@ -98,7 +98,7 @@ fn main() {
         return;
     };
 
-    if let Ok(scrobbles) = parse_log(&file) {
+    if let Ok(mut scrobbles) = parse_log(&file) {
         println!("{} scrobbles loaded.", scrobbles.len());
 
         if !opts.dry_run {
@@ -147,6 +147,116 @@ fn main() {
 
         show_scrobbles(&scrobbles);
 
+        // scrobble editing
+        if Confirm::new()
+            .with_prompt("Edit scrobbles?")
+            .interact()
+            .unwrap()
+        {
+            loop {
+                if let Ok(Some(editing_scrobbles)) = MultiSelect::new()
+                    .with_prompt("Spacebar to select, q/esc to quit")
+                    .items(&scrobbles)
+                    .interact_opt()
+                {
+                    if !editing_scrobbles.is_empty() {
+                        loop {
+                            const FIELDS: &[&str] =
+                                &["Artist", "Title", "Album", "Time", "Delete", "(go back)"];
+                            if let Ok(Some(field)) = Select::new()
+                                .with_prompt("What do you want to change?")
+                                .items(FIELDS)
+                                .default(0)
+                                .interact_opt()
+                            {
+                                match field {
+                                    0..=2 => {
+                                        if let Ok(new_value) = Input::<String>::new()
+                                            .with_prompt(format!("New value for {}", FIELDS[field]))
+                                            .interact_text()
+                                        {
+                                            if new_value.is_empty() {
+                                                continue;
+                                            }
+                                            for &editing_scrobble in &editing_scrobbles {
+                                                let editing_scrobble =
+                                                    scrobbles.get_mut(editing_scrobble).unwrap();
+                                                match field {
+                                                    0 => {
+                                                        editing_scrobble.artist = new_value.clone();
+                                                    }
+                                                    1 => {
+                                                        editing_scrobble.title = new_value.clone();
+                                                    }
+                                                    2 => {
+                                                        editing_scrobble.album = new_value.clone();
+                                                    }
+                                                    _ => unreachable!(),
+                                                };
+                                            }
+                                        }
+                                    }
+                                    3 => {
+                                        println!("Original times were:");
+                                        let mut scrobble_previews: Vec<Scrobble> =
+                                            editing_scrobbles
+                                                .iter()
+                                                .map(|&editing_scrobble| {
+                                                    let scrobble =
+                                                        scrobbles[editing_scrobble].clone();
+                                                    println!("{scrobble}");
+                                                    scrobble
+                                                })
+                                                .collect();
+                                        if let Ok(offset) = Input::<i64>::new()
+                                            .with_prompt("Time offset in minutes")
+                                            .interact()
+                                        {
+                                            println!("New times would be:");
+                                            scrobble_previews.iter_mut().for_each(|scrobble| {
+                                                scrobble.shift_time(offset);
+                                                println!("{scrobble}");
+                                            });
+                                            if Confirm::new()
+                                                .with_prompt("Apply changes?")
+                                                .interact()
+                                                .unwrap()
+                                            {
+                                                editing_scrobbles
+                                                    .iter()
+                                                    .zip(scrobble_previews)
+                                                    .for_each(|(&i, preview)| {
+                                                        scrobbles.get_mut(i).unwrap().timestamp =
+                                                            preview.timestamp;
+                                                    })
+                                            } else {
+                                                println!("No changes were made.");
+                                            }
+                                        }
+                                    }
+                                    4 => {
+                                        for &editing_scrobble in &editing_scrobbles {
+                                            scrobbles.get_mut(editing_scrobble).unwrap().skipped =
+                                                true;
+                                        }
+                                    }
+                                    5 => {
+                                        break;
+                                    }
+                                    _ => unreachable!(),
+                                }
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+
+        // scrobble submission
         if !opts.dry_run {
             if Confirm::new()
                 .with_prompt("Scrobble tracks?")

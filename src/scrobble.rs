@@ -57,6 +57,20 @@ impl Scrobble {
     }
 }
 
+impl std::fmt::Display for Scrobble {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            r#"{}"{}" - "{}" from "{}" ({})"#,
+            if self.skipped { "[SKIPPED] " } else { "" },
+            self.artist,
+            self.title,
+            self.album,
+            self.local_datetime()
+        )
+    }
+}
+
 pub struct Client {
     http_client: reqwest::blocking::Client,
     endpoint: String,
