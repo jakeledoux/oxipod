@@ -1,5 +1,5 @@
 #![warn(clippy::all, clippy::nursery)]
-use clap::{AppSettings, Clap};
+use clap::Parser;
 use comfy_table::{presets::UTF8_FULL, Table};
 use dialoguer::{Confirm, Input, MultiSelect, Password, Select};
 use scrobble::{parse_log, Client, Scrobble};
@@ -29,9 +29,8 @@ impl Default for Config {
     }
 }
 
-#[derive(Clap)]
-#[clap(version, author)]
-#[clap(setting = AppSettings::ColoredHelp)]
+#[derive(Parser)]
+#[clap(author, version, about, long_about = None)]
 #[allow(clippy::struct_excessive_bools)]
 struct Opts {
     /// ".scrobbler.log" path
