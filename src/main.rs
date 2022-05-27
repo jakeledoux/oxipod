@@ -98,7 +98,11 @@ fn main() {
     };
 
     if let Ok(mut scrobbles) = parse_log(&file) {
-        println!("{} scrobbles loaded.", scrobbles.len());
+        println!(
+            "{} scrobbles loaded. ({} skipped)",
+            scrobbles.len(),
+            scrobbles.iter().filter(|s| s.skipped).count()
+        );
 
         if !opts.dry_run {
             let mut write_config = false;
