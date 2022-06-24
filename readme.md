@@ -26,6 +26,8 @@ FLAGS:
 
 - [x] **important** manual time correction
 - [x] scrobble editing
+- [ ] option to move scrobble logs to folder rather than deleting (in case
+  something goes wrong and the data needs to be retrieved)
 - [ ] absolute path conversion for config file
 - [ ] timeless scrobbling (".scrobbler-timeless.log")
 - [ ] delete log when partial success (store failures in ".scrobbler-error.log")
